@@ -1,0 +1,93 @@
+Global Content Delivery Network for Video Streaming
+A media company wants to create a video streaming platform that can serve content to users around the world.
+The platform needs to deliver content with low latency and support adaptive streaming for various network conditions. 
+How would you design the content delivery system, including storage, transcoding, and global distribution?
+
+---
+
+### Detailed Design
+
+#### 1. **Architecture Overview**:
+
+   **Global CDN Integration**:
+   - Use **Amazon CloudFront** to distribute video content globally with low latency, caching the content closer to the users.
+   - Configure CloudFront with **Amazon S3** as the origin for video storage.
+
+   **Adaptive Streaming**:
+   - Use **HLS or MPEG-DASH** for adaptive bitrate streaming. The client app will adjust the stream quality based on available bandwidth.
+
+   **Storage**:
+   - Store videos in **Amazon S3** for scalable, durable storage.
+   - Store metadata about the video (such as format, resolution, etc.) in **Amazon DynamoDB**.
+
+   **Transcoding**:
+   - Use **AWS Elemental MediaConvert** to transcode videos into multiple bitrates and formats.
+   - Use **Amazon SQS** to queue transcoding jobs and ensure reliable delivery.
+
+   **Streaming Service**:
+   - The **StreamingService** fetches the video from **Amazon S3** via **CloudFront**.
+   - The client application uses **HLS** or **DASH** protocols to adapt to the user’s network bandwidth.
+
+   **Content Moderation**:
+   - For videos requiring content moderation (e.g., based on geography or age), use **Amazon Rekognition** to analyze the content and flag it if necessary.
+
+#### 2. **High-Level Flow**:
+
+   - **Upload Process**:
+     1. User uploads a video via UI, which calls the **ContentUploadService**.
+     2. The service stores the video temporarily in **S3** and sends a message to **Amazon SQS**.
+     3. The **TranscoderService** listens to the SQS queue and processes the video using **AWS MediaConvert**, creating multiple renditions for different bandwidths.
+     4. The transcoded files are then stored back in **S3**.
+
+   - **Viewing Process**:
+     1. When a user requests a video, the **ViewingService** first checks **Amazon CloudFront** for cached content.
+     2. If not cached, it retrieves the video from **S3** via **CloudFront**.
+     3. Based on the client’s network conditions, **HLS/DASH** streaming adapts the quality.
+
+#### 3. **Microservices**:
+   - **ContentUploadService**: Handles video uploads, stores in S3, and enqueues transcoding tasks.
+   - **TranscoderService**: Listens to SQS for jobs, transcodes videos using **AWS MediaConvert**, and stores them back to S3.
+   - **ContentCheckService**: Optionally performs moderation checks using **Amazon Rekognition**.
+   - **StreamingService**: Streams videos using **HLS** or **DASH** through CloudFront.
+   - **ViewingService**: Handles video viewing requests, fetching from CloudFront or S3 if needed.
+   - **NotificationService**: Sends notifications (via SNS) when transcoding is complete.
+
+#### 4. **Data Management**:
+   - **Video Metadata**: Store in **Amazon DynamoDB**, including video ID, resolution, bitrates, and format.
+   - **Content Storage**: Store actual videos in **Amazon S3**, and configure **S3 Lifecycle policies** to move older content to **S3 Glacier**.
+
+#### 5. **Scalability**:
+   - Use **Amazon CloudFront** to deliver cached content globally with low latency.
+   - Deploy **multiple instances of microservices** (ContentUploadService, TranscoderService, etc.) using **AWS Lambda** or **ECS** with auto-scaling.
+   - Use **DynamoDB Global Tables** for replication and sharding for storing content metadata.
+   - Autoscale **MediaConvert** transcoding based on queued jobs to handle varying loads.
+
+#### 6. **High Availability**:
+   - Store video content in **S3**, which offers high availability and durability across multiple regions.
+   - Use **Multi-AZ deployment** for DynamoDB and S3 replication for resilience.
+   - CloudFront edge servers ensure the video is served from the closest location for minimal latency.
+
+#### 7. **Security**:
+   - Use **Amazon Cognito** for authentication and access management.
+   - Encrypt data at rest using **S3 encryption** and **KMS**.
+   - Use **HTTPS/SSL** for all data transmission.
+   - Implement **RBAC** (Role-Based Access Control) for user privileges.
+
+#### 8. **Disaster Recovery**:
+   - Depending on the RTO/RPO requirements:
+     - **Multi-site deployment** for near-zero downtime.
+     - **Active-passive failover** for short downtime.
+     - Implement **backup and recovery plans** using **S3 versioning** and **Glacier**.
+
+#### 9. **Data Retention**:
+   - Use **DynamoDB TTL** for content metadata.
+   - Implement S3 lifecycle policies for automatic archival to **S3 Glacier** after a certain period.
+
+#### 10. **Monitoring**:
+   - Use **CloudWatch** to monitor service metrics (latency, error rates, etc.).
+   - Set up alarms for thresholds (e.g., high latency, transcoding failures).
+   - Use **AWS CloudTrail** to track API usage and ensure compliance.
+
+---
+
+This detailed design ensures a robust, scalable, and highly available video streaming platform for a global user base.
