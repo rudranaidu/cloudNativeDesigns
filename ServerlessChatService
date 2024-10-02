@@ -1,0 +1,80 @@
+1. Functional Requirements:
+Real-time messaging, media sharing, and notifications are well-defined.
+Questions to be asked (like supported message types, notifications, daily active users, etc.) are crucial for detailed design.
+Additional questions should be related to performance (i.e., expected concurrent users) and data retention policies.
+
+2. Non-functional Requirements:
+The application needs scalability, fault tolerance, low latency, high availability, and security. 
+These are all adequately addressed in your design. However, specifying concrete latency expectations, handling high-throughput scenarios, and data recovery plans need more detail.
+Gaps and Recommendations:
+1. Real-time Messaging:
+AWS API Gateway with WebSockets is a good choice for handling real-time messaging. Make sure to clarify how you'll handle real-time events through WebSocket connections efficiently at scale.
+Elasticity of WebSocket Connections: You’ll need to plan for scaling WebSocket connections dynamically, as managing millions of concurrent connections may require sophisticated load balancing.
+Stateful/Stateless Handling: Clarify whether the services involved (e.g., MessageService, ChatServer) are stateless. This will impact how they are deployed and scaled.
+
+2. Media Sharing:
+Object storage like Amazon S3 is mentioned for storing media, which is appropriate.
+Optimization: Use S3 Multipart Upload to optimize uploads for larger media files.
+URL Expiry: Make sure to use S3 pre-signed URLs with an expiration time for sharing media files.
+Media Duplication Check: Your idea of hashing the media content before saving is excellent, but clarify whether 
+you're performing this at the client side or the server side to avoid large files being uploaded unnecessarily.
+
+3. Notifications:
+AWS SNS (Simple Notification Service) is well-suited for push notifications, and AWS Pinpoint can be used for more sophisticated notification workflows (push, SMS, email).
+For global users, ensure you're using region-specific endpoints to optimize the delivery of notifications to different geographies.
+
+4. Security:
+End-to-End Encryption (E2EE): This is a critical requirement. While you mentioned KMS for data encryption, E2EE for messaging should use a client-side key exchange mechanism 
+(e.g., Diffie-Hellman key exchange) to ensure that message content remains secure, even from server-side decryption.
+Authentication and Authorization: While you mention Cognito for user authentication, ensure role-based access control (RBAC) is enforced via JWT tokens for specific user roles and actions.
+
+5. Presence and Offline Messaging:
+User Presence: You mention an OnlinePresenceService to check the user's online status. Ensure that this service is updated in real-time by subscribing to WebSocket connections/disconnections and storing state in a fast-access, in-memory data store like Amazon ElastiCache (Redis).
+Offline Messaging: If a user is offline, you store messages in DynamoDB. This is fine, but ensure proper indexing of messages to allow efficient retrieval when the user comes back online.
+
+6. Message Delivery Guarantees:
+Event-Driven Architecture: Using AWS EventBridge is a good approach for event-driven messaging and updates, but it's crucial to ensure at-least-once delivery of messages.
+Consider incorporating SQS (Simple Queue Service) between MessageService and ChatServer to buffer messages in case of any temporary server downtime.
+
+7. Scalability:
+Load Balancer: You mentioned using a load balancer for distributing load across services, but ensure you're using AWS-specific services like API Gateway and AWS Lambda to take full advantage of serverless scalability.
+Global Scale: For global users, implement AWS Global Accelerator for better latency and reliability when routing requests to the nearest available region.
+
+8. Fault Tolerance:
+AWS services like DynamoDB Global Tables and S3 Cross-Region Replication can improve fault tolerance. 
+Ensure that every component can seamlessly switch over to other regions in case of failure.
+
+9. Low Latency:
+Edge Computing: To further reduce latency, you can leverage AWS CloudFront for distributing static content and even exploring Lambda@Edge for executing code closer to the users.
+
+10. Data Retention:
+You mentioned DynamoDB TTL for managing message expiration. Ensure that you also consider compliance and data privacy rules (such as GDPR) for data retention and deletion.
+S3 Object Lifecycle Policies can be used to move expired messages to long-term, cost-effective storage like S3 Glacier.
+
+11. Disaster Recovery:
+Clarify the RTO (Recovery Time Objective) and RPO (Recovery Point Objective) requirements. For a chat application, minimizing data loss is critical, 
+so multi-region, active-active deployment may be more suitable than active-passive.
+
+12. Monitoring and Logging:
+AWS CloudWatch should be set up with detailed metrics to monitor WebSocket connections, API calls, latency, and DynamoDB read/write capacity. Ensure you configure proper CloudWatch Alarms for critical thresholds like message delivery delays or increased error rates.
+Additionally, use AWS X-Ray for tracing requests across the system to identify latency bottlenecks.
+
+Detailed Design Proposal:
+Architecture Overview:
+Frontend: Mobile/Web client (React Native/Flutter for mobile, React/Angular for web)
+
+Use WebSocket for real-time messaging.
+Media sharing via pre-signed URLs.
+Push notifications via SNS/Pinpoint.
+Backend (Serverless Microservices):
+
+API Gateway: Handles HTTP requests and WebSocket connections.
+Lambda Functions: Handles business logic for message processing, notifications, and media handling.
+DynamoDB: NoSQL database for message storage, user presence, and metadata.
+DynamoDB Global Tables for cross-region replication.
+S3: For storing media (images, videos) and message backups.
+SQS: Message queuing between services to ensure reliable message delivery.
+EventBridge: For handling message status updates (sent, delivered, read) and notifications.
+ElastiCache (Redis): For user presence and real-time state tracking.
+Cognito: For user authentication and authorization.
+KMS: For encryption of messages at rest.
