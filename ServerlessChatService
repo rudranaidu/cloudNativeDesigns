@@ -78,3 +78,14 @@ EventBridge: For handling message status updates (sent, delivered, read) and not
 ElastiCache (Redis): For user presence and real-time state tracking.
 Cognito: For user authentication and authorization.
 KMS: For encryption of messages at rest.
+
+
+Flow of Chat Application Using AWS Services
+Client Interaction: The user sends a message from the mobile/web client, which is forwarded to the API Gateway.
+AWS Lambda (Message Processing): The message is passed to an AWS Lambda function that processes the message content, checks the recipient’s online status via Redis (Amazon ElastiCache).
+Amazon SQS (Message Queueing): If the recipient is offline, the message is pushed into SQS, which queues the message for reliable delivery.
+Amazon S3 (Media Storage): If the message contains media, such as images or videos, Lambda saves the content in Amazon S3 and generates a URL, which is sent via SQS.
+Amazon DynamoDB (Message Storage): Both media links and text messages are saved in DynamoDB, ensuring persistence and durability of messages.
+AWS EventBridge (Message Status): To track message status (sent, delivered, read), EventBridge captures status events, which Lambda processes and updates in DynamoDB.
+Amazon SNS (Notifications): SNS sends notifications to the user when new messages are received or when there’s a status update, such as "message delivered" or "message read."
+Message Delivery to Recipient: When the recipient comes online, the chat application retrieves the message from SQS and delivers it in real-time through WebSocket connections via API Gateway.
